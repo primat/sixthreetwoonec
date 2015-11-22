@@ -46,7 +46,7 @@ public class CustomerClient extends Client {
 						+ " at bank " + bank);
 			}
 		} catch (AppException e) {
-			System.out.println(e.getMessage());
+			logger.info(this.getTextId() + ": " + e.getMessage());
 		}
 		
 		return newLoanId;
@@ -78,7 +78,7 @@ public class CustomerClient extends Client {
 				logger.info(this.getTextId() + ": Could not open account " + emailAddress + " at bank " + bank + ".");
 			}
 		} catch (AppException e) {
-			System.out.println(e.getMessage());
+			logger.info(this.getTextId() + ": " + e.getMessage());
 		}
 
 		return accountNbr;
@@ -105,7 +105,7 @@ public class CustomerClient extends Client {
 				logger.info(this.getTextId() + ": Loan transfer to " + newBankId + " failed.");
 			}
 		} catch (AppException e) {
-			System.out.println(e.getMessage());
+			logger.info(this.getTextId() + ": " + e.getMessage());
 		}
 		
 		return newLoanId;

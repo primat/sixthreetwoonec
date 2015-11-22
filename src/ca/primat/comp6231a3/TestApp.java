@@ -50,7 +50,7 @@ public class TestApp {
 		// This method's results, run multiple times, should alternate between a
 		// scenario where bank 3 gets a loan of 600 and, a scenario where where
 		// banks 1 and 2 both get a loan for 500
-		//this.testGetLoan();
+		this.testGetLoan();
 
 		/* ********* TEST DELAY PAYMENT *****************/
 		// This method tests the delayPament operation
@@ -58,14 +58,14 @@ public class TestApp {
 		
 		/* ********* TEST TRANSFER LOAN *****************/
 		// Transfers a loan from one bank to the other
-		this.testTransferLoan();
+		//this.testTransferLoan();
 
 		
 		serverthread.join();
 	}
 	
 	/**
-	 * Test method #3 - Tests concurrency for the DelayLoan operation
+	 * Test method #3 - Tests concurrency for the DelayPayment operation
 	 * 
 	 * @throws InterruptedException
 	 */
@@ -156,8 +156,6 @@ public class TestApp {
 	 */
 	public void testOpenAccount() throws InterruptedException {
 
-		// Create a few customer clients in their own threads and make them do some operations
-		//CustomerClient cust1 = null;
 		final Thread tc1 = new Thread() {
 			@Override
 			public void run() {

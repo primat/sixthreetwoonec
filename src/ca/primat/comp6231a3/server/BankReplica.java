@@ -227,7 +227,8 @@ public class BankReplica {
 				return new ServerResponse(false, "", "Loan id " + loanId + " - currentDate argument mismatch");
 			}*/
 			if (!loan.getDueDate().before(dateNew)) {
-				logger.info(this.bank.getTextId() + ": Loan id " + loanId + " - currentDueDate argument must be later than the actual current due date of the loan");
+				logger.info(this.bank.getTextId() + ": Loan id " + loanId
+						+ " - currentDueDate argument must be later than the actual current due date of the loan");
 				return false;
 			}
 			
@@ -276,74 +277,82 @@ public class BankReplica {
 	    	
 		synchronized (lock) {
 
-		    try {
-				// Test the existence of the account (again, now that we're in the critical section)
-				// The account could have gotten deleted just before the synchronized block
+			try {
+				// Test the existence of the account (again, now that we're in
+				// the critical section)
+				// The account could have gotten deleted just before the
+				// synchronized block
 				account = this.bank.getAccount(accountNbr);
 				if (account == null) {
-					String message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr + " does not exist.";
+					String message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr
+							+ " does not exist.";
 					logger.info(this.bank.getTextId() + ": " + message);
 					throw new AppException(message);
 				}
-				
+
 				// Validate that passwords match
 				if (!account.getPassword().equals(password)) {
 					String message = "Loan refused at bank " + this.bank.getId() + ". Invalid credentials.";
 					logger.info(this.bank.getTextId() + ": " + message);
 					throw new AppException(message);
 				}
-	
-				// Avoid making UDP requests if the loan amount is already bigger than the credit limit of the local account
+
+				// Avoid making UDP requests if the loan amount is already
+				// bigger than the credit limit of the local account
 				int currentLoanAmount = this.bank.getLoanSum(account.getEmailAddress());
 				if (currentLoanAmount + requestedLoanAmount > account.getCreditLimit()) {
 					String message = "Loan refused at bank " + this.bank.getId() + ". Local credit limit exceeded";
 					logger.info(this.bank.getTextId() + ": " + message);
 					throw new AppException(message);
 				}
-	
-				// Get the loan sum for all banks and approve or not the new loan
-			    for (BankReplicaStub destinationBank : this.group.values()) {
-			    	if (!this.getStub().equals(destinationBank)) {
-						Callable<MessageResponseLoanSum> callable = new UdpGetLoanCallable(this.bank, destinationBank, account.getEmailAddress(), 0, this.logger);
+
+				// Get the loan sum for all banks and approve or not the new
+				// loan
+				for (BankReplicaStub destinationBank : this.group.values()) {
+					if (!this.getStub().equals(destinationBank)) {
+						Callable<MessageResponseLoanSum> callable = new UdpGetLoanCallable(this.bank, destinationBank,
+								account.getEmailAddress(), 0, this.logger);
 						Future<MessageResponseLoanSum> future = pool.submit(callable);
 						set.add(future);
 					}
 				}
-	
+
 				for (Future<MessageResponseLoanSum> future : set) {
-		
+
 					try {
 						MessageResponseLoanSum loanSumResponse = future.get();
 						if (loanSumResponse == null) {
-							String message = "Loan refused at bank " + this.bank.getId() + ". Unable to obtain a status for the original loan request.";
+							String message = "Loan refused at bank " + this.bank.getId()
+									+ ". Unable to obtain a status for the original loan request.";
 							logger.info(this.bank.getTextId() + ": " + message);
 							throw new AppException(message);
-						}
-						else if (loanSumResponse.status) {
+						} else if (loanSumResponse.status) {
 							externalLoanSum += loanSumResponse.loanSum;
-						}
-						else {
-							String message = "Loan refused at bank " + this.bank.getId() + ". " + loanSumResponse.message;
+						} else {
+							String message = "Loan refused at bank " + this.bank.getId() + ". "
+									+ loanSumResponse.message;
 							logger.info(this.bank.getTextId() + ": " + message);
 							throw new AppException(message);
 						}
 					} catch (InterruptedException e) {
 						e.printStackTrace();
-						String message = "Loan request failed for user " + account.getEmailAddress() + ". InterruptedException";
+						String message = "Loan request failed for user " + account.getEmailAddress()
+								+ ". InterruptedException";
 						logger.info(this.bank.getTextId() + ": " + message);
 						throw new AppException(message);
-						
+
 					} catch (ExecutionException e) {
 						e.printStackTrace();
-						String message = "Loan request failed for user " + account.getEmailAddress() + ". ExecutionException";
+						String message = "Loan request failed for user " + account.getEmailAddress()
+								+ ". ExecutionException";
 						logger.info(this.bank.getTextId() + ": " + message);
 						throw new AppException(message);
 					}
 				}
 
-		    } finally {
+			} finally {
 				pool.shutdown();
-		    }
+			}
 			
 			// Refuse the loan request if the sum of all loans is greater than the credit limit
 			if ((requestedLoanAmount + externalLoanSum) > account.getCreditLimit()) {

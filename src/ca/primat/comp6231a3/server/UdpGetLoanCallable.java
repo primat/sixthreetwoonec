@@ -87,7 +87,7 @@ public class UdpGetLoanCallable implements Callable<MessageResponseLoanSum> {
 			//
 			// GETTING RESPONSE
 			//
-			clientSocket.setSoTimeout(10000);
+			clientSocket.setSoTimeout(5000);
 			
 			try {
 
