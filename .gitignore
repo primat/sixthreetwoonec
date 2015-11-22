@@ -1,0 +1,12 @@
+/bin/
+.project
+.classpath
+security.policy
+.settings
+/Bank*
+/Customer*
+/Manager*
+/ReplicaManager*
+/src/orb.db
+/src/dlms
+
