@@ -25,7 +25,6 @@ import ca.primat.comp6231a3.model.Loan;
 import ca.primat.comp6231a3.model.ThreadSafeHashMap;
 import ca.primat.comp6231a3.udpmessage.MessageResponseLoanSum;
 import ca.primat.comp6231a3.udpmessage.MessageResponseTransferLoan;
-import dlms.GetLoanResponse;
 
 /**
  * The bank replica acts as a bank server and proxy for the underlying bank
@@ -248,12 +247,12 @@ public class BankReplica {
 	 * @throws AppException 
 	 */
 	public int getLoan(int accountNbr, String password, int requestedLoanAmount) throws AppException {
-		
+
 		int newLoanId = -1; 
 		int externalLoanSum = 0; // The total sum of loans at other banks for accountNbr
 		Object lock = null;
 		Account account; // The account corresponding to the account number
-		GetLoanResponse response = new GetLoanResponse(false, "", "", newLoanId);
+		//GetLoanResponse response = new GetLoanResponse(false, "", "", newLoanId);
 		ExecutorService pool;
 		Set<Future<MessageResponseLoanSum>> set;
 		
@@ -274,93 +273,93 @@ public class BankReplica {
 		// Prepare the threads to call other banks to get the loan sum for this account
 		pool = Executors.newFixedThreadPool(this.group.size()-1);
 	    set = new HashSet<Future<MessageResponseLoanSum>>();
-	
+	    	
 		synchronized (lock) {
 
-			// Test the existence of the account (again, now that we're in the critical section)
-			// The account could have gotten deleted just before the synchronized block
-			account = this.bank.getAccount(accountNbr);
-			if (account == null) {
-				response.message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr + " does not exist.";
-				logger.info(this.bank.getTextId() + ": " + response.message);
-				return response.loanId;
-			}
-			
-			// Validate that passwords match
-			if (!account.getPassword().equals(password)) {
-				response.message = "Loan refused at bank " + this.bank.getId() + ". Invalid credentials.";
-				logger.info(this.bank.getTextId() + ": " + response.message);
-				return response.loanId;
-			}
-
-			// Avoid making UDP requests if the loan amount is already bigger than the credit limit of the local account
-			int currentLoanAmount = this.bank.getLoanSum(account.getEmailAddress());
-			if (currentLoanAmount + requestedLoanAmount > account.getCreditLimit()) {
-				response.message = "Loan refused at bank " + this.bank.getId() + ". Local credit limit exceeded";
-				logger.info(this.bank.getTextId() + ": " + response.message);
-				return response.loanId;
-			}
-
-			// Get the loan sum for all banks and approve or not the new loan
-		    for (BankReplicaStub destinationBank : this.group.values()) {
-		    	if (!this.getStub().equals(destinationBank)) {
-					Callable<MessageResponseLoanSum> callable = new UdpGetLoanCallable(this.bank, destinationBank, account.getEmailAddress(), 0, this.logger);
-					Future<MessageResponseLoanSum> future = pool.submit(callable);
-					set.add(future);
+		    try {
+				// Test the existence of the account (again, now that we're in the critical section)
+				// The account could have gotten deleted just before the synchronized block
+				account = this.bank.getAccount(accountNbr);
+				if (account == null) {
+					String message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr + " does not exist.";
+					logger.info(this.bank.getTextId() + ": " + message);
+					throw new AppException(message);
 				}
-			}
-
-			for (Future<MessageResponseLoanSum> future : set) {
+				
+				// Validate that passwords match
+				if (!account.getPassword().equals(password)) {
+					String message = "Loan refused at bank " + this.bank.getId() + ". Invalid credentials.";
+					logger.info(this.bank.getTextId() + ": " + message);
+					throw new AppException(message);
+				}
 	
-				try {
-					MessageResponseLoanSum loanSumResponse = future.get();
-					if (loanSumResponse == null) {
-						response.message = "Loan refused at bank " + this.bank.getId() + ". Unable to obtain a status for the original loan request.";
-						logger.info(this.bank.getTextId() + ": " + response.message);
-						return response.loanId;
-					}
-					else if (loanSumResponse.status) {
-						externalLoanSum += loanSumResponse.loanSum;
-					}
-					else {
-						response.message = "Loan refused at bank " + this.bank.getId() + ". " + loanSumResponse.message;
-						logger.info(this.bank.getTextId() + ": " + response.message);
-						return response.loanId;
-					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-					response.message = "Loan request failed for user " + account.getEmailAddress() + ". InterruptedException";
-					logger.info(this.bank.getTextId() + ": " + response.message);
-					return response.loanId;
-					
-				} catch (ExecutionException e) {
-					e.printStackTrace();
-					response.message = "Loan request failed for user " + account.getEmailAddress() + ". ExecutionException";
-					logger.info(this.bank.getTextId() + ": " + response.message);
-					return response.loanId;
+				// Avoid making UDP requests if the loan amount is already bigger than the credit limit of the local account
+				int currentLoanAmount = this.bank.getLoanSum(account.getEmailAddress());
+				if (currentLoanAmount + requestedLoanAmount > account.getCreditLimit()) {
+					String message = "Loan refused at bank " + this.bank.getId() + ". Local credit limit exceeded";
+					logger.info(this.bank.getTextId() + ": " + message);
+					throw new AppException(message);
 				}
-			}
+	
+				// Get the loan sum for all banks and approve or not the new loan
+			    for (BankReplicaStub destinationBank : this.group.values()) {
+			    	if (!this.getStub().equals(destinationBank)) {
+						Callable<MessageResponseLoanSum> callable = new UdpGetLoanCallable(this.bank, destinationBank, account.getEmailAddress(), 0, this.logger);
+						Future<MessageResponseLoanSum> future = pool.submit(callable);
+						set.add(future);
+					}
+				}
+	
+				for (Future<MessageResponseLoanSum> future : set) {
+		
+					try {
+						MessageResponseLoanSum loanSumResponse = future.get();
+						if (loanSumResponse == null) {
+							String message = "Loan refused at bank " + this.bank.getId() + ". Unable to obtain a status for the original loan request.";
+							logger.info(this.bank.getTextId() + ": " + message);
+							throw new AppException(message);
+						}
+						else if (loanSumResponse.status) {
+							externalLoanSum += loanSumResponse.loanSum;
+						}
+						else {
+							String message = "Loan refused at bank " + this.bank.getId() + ". " + loanSumResponse.message;
+							logger.info(this.bank.getTextId() + ": " + message);
+							throw new AppException(message);
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+						String message = "Loan request failed for user " + account.getEmailAddress() + ". InterruptedException";
+						logger.info(this.bank.getTextId() + ": " + message);
+						throw new AppException(message);
+						
+					} catch (ExecutionException e) {
+						e.printStackTrace();
+						String message = "Loan request failed for user " + account.getEmailAddress() + ". ExecutionException";
+						logger.info(this.bank.getTextId() + ": " + message);
+						throw new AppException(message);
+					}
+				}
 
-			pool.shutdown();
+		    } finally {
+				pool.shutdown();
+		    }
 			
 			// Refuse the loan request if the sum of all loans is greater than the credit limit
 			if ((requestedLoanAmount + externalLoanSum) > account.getCreditLimit()) {
-				response.message = "Loan refused at bank " + this.bank.getId() + ". Total credit limit exceeded.";
-				logger.info(this.bank.getTextId() + ": " + response.message);
-				return response.loanId;
+				String message = "Loan refused at bank " + this.bank.getId() + ". Total credit limit exceeded.";
+				logger.info(this.bank.getTextId() + ": " + message);
+				throw new AppException(message);
 			}
 			
 			// Loan is approved at this point
 			newLoanId = this.bank.createLoan(account.getEmailAddress(), accountNbr, requestedLoanAmount);
 
-			response.result = true;
-			response.message = "Loan approved for user " + account.getEmailAddress() + ", amount " + requestedLoanAmount + " at bank " + this.bank.getId() + ".";
-			response.loanId = newLoanId;
-			logger.info(this.bank.getTextId() + ": " + response.message);
+			String message = "Loan approved for user " + account.getEmailAddress() + ", amount " + requestedLoanAmount + " at bank " + this.bank.getId() + ".";
+			logger.info(this.bank.getTextId() + ": " + message);
 
-			return response.loanId;
+			return newLoanId;
 		}
-		
 	}
 	
 	/**
