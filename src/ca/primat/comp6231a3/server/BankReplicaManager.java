@@ -28,14 +28,14 @@ import ca.primat.comp6231a3.model.Loan;
 public class BankReplicaManager implements IBankServer {
 
 	private HashMap<String, BankReplica> bankReplicas;
-	private BankReplicaGroup replicaGroup;
+	private BankReplicaStubGroup replicaGroup;
 	private Logger logger = null;
 	public HashMap<String, Object> locks;
 
 	/**
 	 * Constructor
 	 */
-	public BankReplicaManager(BankReplicaGroup replicaGroup) {
+	public BankReplicaManager(BankReplicaStubGroup replicaGroup) {
 
 		super();
 		

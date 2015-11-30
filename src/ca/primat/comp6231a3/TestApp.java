@@ -44,13 +44,13 @@ public class TestApp {
 		/* ********* TEST OPEN ACCOUNT *****************/
 		// This method runs a bunch of openAccount operations at the same time
 		// and makes sure no bank contains two of the same account
-		//this.testOpenAccount();
+		this.testOpenAccount();
 		
 		/* ********* TEST GET LOAN *****************/
 		// This method's results, run multiple times, should alternate between a
 		// scenario where bank 3 gets a loan of 600 and, a scenario where where
 		// banks 1 and 2 both get a loan for 500
-		this.testGetLoan();
+		//this.testGetLoan();
 
 		/* ********* TEST DELAY PAYMENT *****************/
 		// This method tests the delayPament operation

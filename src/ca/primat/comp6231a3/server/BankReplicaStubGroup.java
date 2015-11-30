@@ -8,7 +8,7 @@ import java.util.HashMap;
  * @author mat
  *
  */
-public class BankReplicaGroup extends HashMap<String, BankReplicaStub> {
+public class BankReplicaStubGroup extends HashMap<String, BankReplicaStub> {
 
 	/**
 	 * 

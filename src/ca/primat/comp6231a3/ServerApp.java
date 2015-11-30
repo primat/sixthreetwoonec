@@ -4,7 +4,7 @@ import java.net.InetSocketAddress;
 
 import javax.xml.ws.Endpoint;
 
-import ca.primat.comp6231a3.server.BankReplicaGroup;
+import ca.primat.comp6231a3.server.BankReplicaStubGroup;
 import ca.primat.comp6231a3.server.BankReplicaManager;
 import ca.primat.comp6231a3.server.BankReplicaStub;
 
@@ -18,7 +18,7 @@ public class ServerApp implements Runnable {
 
 	public static final String ENDPOINT_URL = "http://localhost:8080/ws/";
 	
-	protected BankReplicaGroup replicaGroup;
+	protected BankReplicaStubGroup replicaGroup;
 
 	/**
 	 * The application launcher. Starts either as a standalone process or can be
@@ -38,7 +38,7 @@ public class ServerApp implements Runnable {
 	@Override
 	public void run() {
 
-		this.replicaGroup = new BankReplicaGroup();
+		this.replicaGroup = new BankReplicaStubGroup();
 		
 		// Establish the bank details
 		this.replicaGroup.put("rbc", new BankReplicaStub("rbc", new InetSocketAddress("localhost", 10101)));

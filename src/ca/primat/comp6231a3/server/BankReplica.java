@@ -35,7 +35,7 @@ import ca.primat.comp6231a3.udpmessage.MessageResponseTransferLoan;
  */
 public class BankReplica {
 	
-	private BankReplicaGroup group = null;
+	private BankReplicaStubGroup group = null;
 	private Logger logger = null;
 	private Thread udpListenerThread;
 	private UdpListener udpListener;
@@ -49,7 +49,7 @@ public class BankReplica {
 	 */
 	BankReplica(String id, InetSocketAddress addr) {
 
-		this.group = new BankReplicaGroup();
+		this.group = new BankReplicaStubGroup();
 		this.bank = new Bank(id, addr);
 		
 		// Set up the logger
@@ -111,7 +111,7 @@ public class BankReplica {
 	 * 
 	 * @return
 	 */
-	public void setGroup(BankReplicaGroup group) {
+	public void setGroup(BankReplicaStubGroup group) {
 		
 		this.group = group;
 	}
@@ -253,7 +253,6 @@ public class BankReplica {
 		int externalLoanSum = 0; // The total sum of loans at other banks for accountNbr
 		Object lock = null;
 		Account account; // The account corresponding to the account number
-		//GetLoanResponse response = new GetLoanResponse(false, "", "", newLoanId);
 		ExecutorService pool;
 		Set<Future<MessageResponseLoanSum>> set;
 		
@@ -270,44 +269,44 @@ public class BankReplica {
 		}
 
 		lock = this.bank.getLockObject(account.getEmailAddress());
-
-		// Prepare the threads to call other banks to get the loan sum for this account
-		pool = Executors.newFixedThreadPool(this.group.size()-1);
-	    set = new HashSet<Future<MessageResponseLoanSum>>();
 	    	
 		synchronized (lock) {
 
+			// Test the existence of the account (again, now that we're in
+			// the critical section)
+			// The account could have gotten deleted just before the
+			// synchronized block
+			account = this.bank.getAccount(accountNbr);
+			if (account == null) {
+				String message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr
+						+ " does not exist.";
+				logger.info(this.bank.getTextId() + ": " + message);
+				throw new AppException(message);
+			}
+
+			// Validate that passwords match
+			if (!account.getPassword().equals(password)) {
+				String message = "Loan refused at bank " + this.bank.getId() + ". Invalid credentials.";
+				logger.info(this.bank.getTextId() + ": " + message);
+				throw new AppException(message);
+			}
+
+			// Avoid making UDP requests if the loan amount is already
+			// bigger than the credit limit of the local account
+			int currentLoanAmount = this.bank.getLoanSum(account.getEmailAddress());
+			if (currentLoanAmount + requestedLoanAmount > account.getCreditLimit()) {
+				String message = "Loan refused at bank " + this.bank.getId() + ". Local credit limit exceeded";
+				logger.info(this.bank.getTextId() + ": " + message);
+				throw new AppException(message);
+			}
+
+			// Prepare the threads to call other banks to get the loan sum for this account
+			pool = Executors.newFixedThreadPool(this.group.size()-1);
+		    set = new HashSet<Future<MessageResponseLoanSum>>();
+		    
 			try {
-				// Test the existence of the account (again, now that we're in
-				// the critical section)
-				// The account could have gotten deleted just before the
-				// synchronized block
-				account = this.bank.getAccount(accountNbr);
-				if (account == null) {
-					String message = "Loan refused at bank " + this.bank.getId() + ". Account " + accountNbr
-							+ " does not exist.";
-					logger.info(this.bank.getTextId() + ": " + message);
-					throw new AppException(message);
-				}
 
-				// Validate that passwords match
-				if (!account.getPassword().equals(password)) {
-					String message = "Loan refused at bank " + this.bank.getId() + ". Invalid credentials.";
-					logger.info(this.bank.getTextId() + ": " + message);
-					throw new AppException(message);
-				}
-
-				// Avoid making UDP requests if the loan amount is already
-				// bigger than the credit limit of the local account
-				int currentLoanAmount = this.bank.getLoanSum(account.getEmailAddress());
-				if (currentLoanAmount + requestedLoanAmount > account.getCreditLimit()) {
-					String message = "Loan refused at bank " + this.bank.getId() + ". Local credit limit exceeded";
-					logger.info(this.bank.getTextId() + ": " + message);
-					throw new AppException(message);
-				}
-
-				// Get the loan sum for all banks and approve or not the new
-				// loan
+				// Get the loan sum for all banks and approve or not the new loan
 				for (BankReplicaStub destinationBank : this.group.values()) {
 					if (!this.getStub().equals(destinationBank)) {
 						Callable<MessageResponseLoanSum> callable = new UdpGetLoanCallable(this.bank, destinationBank,
@@ -402,7 +401,11 @@ public class BankReplica {
 				if (resp.status) {
 				
 					// Loan transfered successfully. It must now be deleted locally.
-					this.bank.deleteLoan(loanId);
+					// If it can't be deleted, we have to roll back!
+					if (!this.bank.deleteLoan(loanId)) {
+						// Of course, this one too could fail...
+						rollbackLoanTransfer(otherBankStub, resp.loanId);
+					}
 					
 					logger.info(this.bank.getTextId() + ": Loan transfer " + loanId + " to " + otherBankStub.id + " successful");
 					return resp.loanId;
@@ -423,4 +426,14 @@ public class BankReplica {
 		}
 	}
 	
+	/**
+	 * 
+	 * @param otherBankStub
+	 * @param loanId
+	 * @return
+	 */
+	private boolean rollbackLoanTransfer(BankReplicaStub otherBankStub, int loanId) {
+		
+		return true;
+	}
 }
